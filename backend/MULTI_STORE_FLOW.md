@@ -1,18 +1,18 @@
 # Multi-Store Context - Business Flow Documentation
 
-## ?? Business Scenario
+## -- Business Scenario
 
 ### User Journey
-1. **User creates account** ? `/api/auth/register` (NO StoreId)
-2. **User signs in** ? `/api/auth/login` (NO StoreId) ? Receives JWT token
-3. **User views accessible stores** ? `/api/store/my-stores` (NO StoreId) ? Returns owned stores + team member stores
-4. **User selects a store** ? Frontend stores StoreId in localStorage
-5. **User accesses store features** ? All requests include `X-Store-ID` header ? Backend filters data by StoreId
-6. **User exits store** ? Frontend clears StoreId from localStorage
+1. **User creates account** - `/api/auth/register` (NO StoreId)
+2. **User signs in** - `/api/auth/login` (NO StoreId) - Receives JWT token
+3. **User views accessible stores** - `/api/store/my-stores` (NO StoreId) - Returns owned stores + team member stores
+4. **User selects a store** - Frontend stores StoreId in localStorage
+5. **User accesses store features** - All requests include `X-Store-ID` header - Backend filters data by StoreId
+6. **User exits store** - Frontend clears StoreId from localStorage
 
-## ?? Endpoint Classification
+## -- Endpoint Classification
 
-### ? Non-Store-Scoped Endpoints (NO X-Store-ID header needed)
+### - Non-Store-Scoped Endpoints (NO X-Store-ID header needed)
 
 #### Authentication
 - `POST /api/auth/register` - Create account
@@ -35,7 +35,7 @@
 - `PUT /api/store/{id}` - Update store details
 - `DELETE /api/store/{id}` - Delete store
 
-### ? Store-Scoped Endpoints (X-Store-ID header REQUIRED)
+### - Store-Scoped Endpoints (X-Store-ID header REQUIRED)
 
 All other endpoints require X-Store-ID header and data is automatically filtered:
 
@@ -71,57 +71,57 @@ All other endpoints require X-Store-ID header and data is automatically filtered
 - `GET /api/automationtask/store/{storeId}` - Get tasks for store
 - `POST /api/automationtask` - Create task in current store
 
-## ?? Request Flow
+## -- Request Flow
 
 ### Non-Store-Scoped Request
 ```
-User ? POST /api/auth/login
+User - POST /api/auth/login
 Headers: Authorization: Bearer {token}
 Body: { "email": "...", "password": "..." }
-?
-No X-Store-ID header ? Middleware does nothing
-?
+-
+No X-Store-ID header - Middleware does nothing
+-
 AuthController.Login()
-?
+-
 Returns JWT token
 ```
 
 ### Store-Scoped Request (Valid Store)
 ```
-User ? GET /api/product
+User - GET /api/product
 Headers: 
   - Authorization: Bearer {token}
   - X-Store-ID: 550e8400-e29b-41d4-a716-446655440000 (valid store user has access to)
-?
-StoreContextMiddleware: Extracts StoreId from header ? Sets StoreContext.StoreId
-?
-Authentication: Validates JWT token ? Sets UserId
-?
+-
+StoreContextMiddleware: Extracts StoreId from header - Sets StoreContext.StoreId
+-
+Authentication: Validates JWT token - Sets UserId
+-
 StoreValidationMiddleware: 
-  1. Checks store exists ? ? Found
-  2. Checks user belongs to store ? ? Owner or team member
-?
+  1. Checks store exists - - Found
+  2. Checks user belongs to store - - Owner or team member
+-
 ProductController.GetAllProducts()
-?
+-
 EF Core applies global filter: WHERE StoreId = '550e8400-...' AND !IsDeleted
-?
+-
 Returns products for selected store only
 ```
 
 ### Store-Scoped Request (Non-Existent Store)
 ```
-User ? GET /api/campaigns/3fa85f64-5717-4562-b3fc-2c963f66afa7
+User - GET /api/campaigns/3fa85f64-5717-4562-b3fc-2c963f66afa7
 Headers: 
   - Authorization: Bearer {token}
   - X-Store-ID: 3fa85f64-5717-4562-b3fc-2c963f66afa7 (FAKE store ID)
-?
-StoreContextMiddleware: Extracts StoreId from header ? Sets StoreContext.StoreId
-?
-Authentication: Validates JWT token ? Sets UserId
-?
+-
+StoreContextMiddleware: Extracts StoreId from header - Sets StoreContext.StoreId
+-
+Authentication: Validates JWT token - Sets UserId
+-
 StoreValidationMiddleware: 
-  1. Checks store exists ? ? NOT FOUND
-?
+  1. Checks store exists - - NOT FOUND
+-
 Returns: 404 Not Found
 {
   "error": "Store Not Found",
@@ -131,19 +131,19 @@ Returns: 404 Not Found
 
 ### Store-Scoped Request (No Access)
 ```
-User ? GET /api/product
+User - GET /api/product
 Headers: 
   - Authorization: Bearer {token}
   - X-Store-ID: 550e8400-e29b-41d4-a716-446655440000 (valid store but user is NOT member)
-?
-StoreContextMiddleware: Extracts StoreId from header ? Sets StoreContext.StoreId
-?
-Authentication: Validates JWT token ? Sets UserId
-?
+-
+StoreContextMiddleware: Extracts StoreId from header - Sets StoreContext.StoreId
+-
+Authentication: Validates JWT token - Sets UserId
+-
 StoreValidationMiddleware: 
-  1. Checks store exists ? ? Found
-  2. Checks user belongs to store ? ? NOT owner, NOT team member
-?
+  1. Checks store exists - - Found
+  2. Checks user belongs to store - - NOT owner, NOT team member
+-
 Returns: 403 Forbidden
 {
   "error": "Forbidden",
@@ -151,7 +151,7 @@ Returns: 403 Forbidden
 }
 ```
 
-## ??? Authorization Rules
+## --- Authorization Rules
 
 ### Store Access Validation
 User can access a store if:
@@ -168,7 +168,7 @@ if (!hasAccess)
 }
 ```
 
-## ?? Frontend Implementation (Angular)
+## -- Frontend Implementation (Angular)
 
 ### Login Flow
 ```typescript
@@ -224,17 +224,17 @@ exitStore() {
 }
 ```
 
-## ?? Testing in Swagger
+## -- Testing in Swagger
 
 ### Step 1: Register & Login (NO X-Store-ID)
 ```
 POST /api/auth/register
 Body: { "email": "user@example.com", "password": "Password123!", "fullName": "John Doe" }
-?
+-
 POST /api/auth/login
 Body: { "email": "user@example.com", "password": "Password123!" }
-?
-Copy JWT token ? Click "Authorize" ? Paste token
+-
+Copy JWT token - Click "Authorize" - Paste token
 ```
 
 ### Step 2: Create or View Stores (NO X-Store-ID)
@@ -243,7 +243,7 @@ GET /api/store/my-stores
 Returns: [
   { "id": "550e8400-...", "storeName": "My First Store", ... }
 ]
-?
+-
 Copy Store ID
 ```
 
@@ -254,7 +254,7 @@ Headers: X-Store-ID: 550e8400-e29b-41d4-a716-446655440000
 Returns: Products for that store only
 ```
 
-## ?? Important Notes
+## -- Important Notes
 
 1. **StoreId is NOT in JWT claims** - It's a UI concern only
 2. **StoreId is NOT stored in database** - Only in browser localStorage
@@ -262,7 +262,7 @@ Returns: Products for that store only
 4. **Authorization is enforced** - Users can only access stores they belong to
 5. **Non-scoped endpoints work without X-Store-ID** - Auth, user management, store selection
 
-## ?? Troubleshooting
+## -- Troubleshooting
 
 ### Error: "Invalid Store ID format" (400 Bad Request)
 - **Cause**: X-Store-ID header value is not a valid GUID
@@ -300,27 +300,27 @@ Returns: Products for that store only
 
 **Summary**: Store acts as a "door" to all features. Users authenticate first, select a store, then the frontend sends X-Store-ID with every request. Backend automatically filters data by StoreId using EF Core global query filters.
 
-## ?? Error Response Hierarchy
+## -- Error Response Hierarchy
 
 ```
 Request with X-Store-ID header
-?
-1. Is GUID valid? 
-   NO ? 400 Bad Request: "Invalid Store ID format"
-   ?
-2. Is user authenticated?
-   NO ? 401 Unauthorized: "Authentication required"
-   ?
-3. Does store exist?
-   NO ? 404 Not Found: "Store Not Found"
-   ?
-4. Does user belong to store?
-   NO ? 403 Forbidden: "You do not have access to store"
-   ?
-5. Does specific resource exist?
-   NO ? 404 Not Found: "Campaign/Product/etc. not found"
-   ?
-? SUCCESS ? 200 OK: Returns data
+-
+1. Is GUID valid- 
+   NO - 400 Bad Request: "Invalid Store ID format"
+   -
+2. Is user authenticated-
+   NO - 401 Unauthorized: "Authentication required"
+   -
+3. Does store exist-
+   NO - 404 Not Found: "Store Not Found"
+   -
+4. Does user belong to store-
+   NO - 403 Forbidden: "You do not have access to store"
+   -
+5. Does specific resource exist-
+   NO - 404 Not Found: "Campaign/Product/etc. not found"
+   -
+- SUCCESS - 200 OK: Returns data
 ```
 
 This ensures proper error messages at each validation layer!

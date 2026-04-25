@@ -1,32 +1,32 @@
 # Business Manager - Multi-Tenant SaaS Platform
 
-## ?? Project Overview
+## -- Project Overview
 
 **Business Manager** is a comprehensive multi-tenant SaaS platform designed to help businesses manage their online presence, campaigns, products, orders, and social media marketing. The system supports multiple stores per user, team collaboration, and automated campaign scheduling with social media integration.
 
 ### Key Features
-- ?? **Multi-Tenant Store Management** - Users can create and manage multiple business stores
-- ?? **Team Collaboration** - Store owners can invite team members with role-based access
-- ?? **Social Media Integration** - Connect Facebook and Instagram pages for automated posting
-- ?? **Campaign Management** - Create, schedule, and track marketing campaigns
-- ?? **Automated Scheduling** - Background jobs handle scheduled post publishing via Hangfire
-- ??? **E-commerce Features** - Product catalog, order management, customer tracking
-- ?? **Chatbot FAQ Management** - Manage automated responses for customer inquiries
-- ?? **JWT Authentication** - Secure authentication with refresh token support
-- ?? **AI-Powered Targeting** - Campaign audience targeting recommendations
+- -- **Multi-Tenant Store Management** - Users can create and manage multiple business stores
+- -- **Team Collaboration** - Store owners can invite team members with role-based access
+- -- **Social Media Integration** - Connect Facebook and Instagram pages for automated posting
+- -- **Campaign Management** - Create, schedule, and track marketing campaigns
+- -- **Automated Scheduling** - Background jobs handle scheduled post publishing via Hangfire
+- --- **E-commerce Features** - Product catalog, order management, customer tracking
+- -- **Chatbot FAQ Management** - Manage automated responses for customer inquiries
+- -- **JWT Authentication** - Secure authentication with refresh token support
+- -- **AI-Powered Targeting** - Campaign audience targeting recommendations
 
 ---
 
-## ??? Architecture
+## --- Architecture
 
 This solution follows **Clean Architecture** principles with clear separation of concerns:
 
 ```
 BusinessManager/
-??? Domain/                    # Core business entities and enums
-??? Application/              # Business logic and interfaces
-??? Infrastructure/           # Data access and external services
-??? Presentation/            # API controllers and middleware
+--- Domain/                    # Core business entities and enums
+--- Application/              # Business logic and interfaces
+--- Infrastructure/           # Data access and external services
+--- Presentation/            # API controllers and middleware
 ```
 
 ### Technology Stack
@@ -40,9 +40,9 @@ BusinessManager/
 
 ---
 
-## ?? Project Structure
+## -- Project Structure
 
-### 1?? Domain Layer (`Domain/`)
+### 1-- Domain Layer (`Domain/`)
 
 **Purpose**: Contains core business entities, enums, and domain logic. No dependencies on other layers.
 
@@ -78,7 +78,7 @@ BusinessManager/
 
 ---
 
-### 2?? Application Layer (`Application/`)
+### 2-- Application Layer (`Application/`)
 
 **Purpose**: Contains business logic, DTOs, interfaces, and services. Orchestrates domain objects using **Service-Repository pattern**.
 
@@ -92,7 +92,7 @@ Core business services implementing use cases:
 - **CustomerService.cs** - Customer management
 - **CampaignService.cs** - Campaign lifecycle management
 - **CampaignPostService.cs** - Post scheduling and management
-- **CampaignSchedulingService.cs** - ? Background post publishing logic
+- **CampaignSchedulingService.cs** - - Background post publishing logic
 - **SocialPlatformService.cs** - Social platform connection management
 - **AutomationTaskService.cs** - Task automation
 - **ChatbotFAQService.cs** - FAQ management
@@ -128,7 +128,7 @@ Data transfer objects organized by feature:
 - `IStoreRepository.cs`
 - `IUserRepository.cs`
 - `ICampaignRepository.cs`
-- `ICampaignPostRepository.cs` - ? Includes GetDuePostsAsync()
+- `ICampaignPostRepository.cs` - - Includes GetDuePostsAsync()
 - `ITeamRepository.cs`
 - `ISocialPlatformRepository.cs`
 - `IAutomationTaskRepository.cs`
@@ -143,9 +143,9 @@ Data transfer objects organized by feature:
 - `ICustomerService.cs`
 - `ICampaignService.cs`
 - `ICampaignPostService.cs`
-- `ICampaignSchedulingService.cs` - ? Background scheduling
+- `ICampaignSchedulingService.cs` - - Background scheduling
 - `ISocialPlatformService.cs`
-- `ISocialPlatformPublisher.cs` - ? Platform publishing abstraction
+- `ISocialPlatformPublisher.cs` - - Platform publishing abstraction
 - `IAutomationTaskService.cs`
 - `IChatbotFAQService.cs`
 - `IServiceManager.cs`
@@ -171,7 +171,7 @@ Data transfer objects organized by feature:
 
 ---
 
-### 3?? Infrastructure Layer (`Infrastructure/`)
+### 3-- Infrastructure Layer (`Infrastructure/`)
 
 **Purpose**: Implements interfaces from Application layer. Handles data persistence, external APIs, and background jobs.
 
@@ -211,7 +211,7 @@ Implementation of repository interfaces:
 - **StoreRepository.cs**
 - **UserRepository.cs**
 - **CampaignRepository.cs**
-- **CampaignPostRepository.cs** - ? Implements GetDuePostsAsync()
+- **CampaignPostRepository.cs** - - Implements GetDuePostsAsync()
 - **TeamRepository.cs**
 - **SocialPlatformRepository.cs**
 - **AutomationTaskRepository.cs**
@@ -222,14 +222,14 @@ Implementation of repository interfaces:
 - **StoreContext.cs** - Manages current store context
 - **StoreAuthorizationService.cs** - Validates store access
 - **DataSeeding.cs** - Seeds initial data from JSON files
-- **FacebookPublisher.cs** - ? Publishes posts to Facebook Pages
+- **FacebookPublisher.cs** - - Publishes posts to Facebook Pages
 
 #### Background Jobs (`Infrastructure/BackgroundJobs/`)
-- **CampaignSchedulerJob.cs** - ? Hangfire job that processes due campaign posts
+- **CampaignSchedulerJob.cs** - - Hangfire job that processes due campaign posts
 
 ---
 
-### 4?? Presentation Layer (`Presentation/`)
+### 4-- Presentation Layer (`Presentation/`)
 
 **Purpose**: ASP.NET Core Web API. Handles HTTP requests, authentication, and API documentation.
 
@@ -264,7 +264,7 @@ RESTful API endpoints:
 
 ---
 
-## ?? Campaign Scheduling Flow
+## -- Campaign Scheduling Flow
 
 ### How Automated Post Publishing Works
 
@@ -335,12 +335,12 @@ foreach (var post in duePosts)
 
 ---
 
-## ?? Authentication & Authorization
+## -- Authentication & Authorization
 
 ### Multi-Layered Security
 
 #### 1. **JWT Authentication**
-- **Login**: `POST /api/auth/login` ? Returns access token + refresh token
+- **Login**: `POST /api/auth/login` - Returns access token + refresh token
 - **Token Validation**: Every request validates JWT signature
 - **Claims**: UserId, Email extracted from token
 
@@ -358,7 +358,7 @@ Users can access a store if:
 
 ---
 
-## ??? Database Schema
+## --- Database Schema
 
 ### Key Tables
 
@@ -396,7 +396,7 @@ Users can access a store if:
 
 ---
 
-## ?? Getting Started
+## -- Getting Started
 
 ### Prerequisites
 - .NET 8 SDK
@@ -453,7 +453,7 @@ Navigate to: `https://localhost:5001/hangfire`
 
 ---
 
-## ?? API Workflow Examples
+## -- API Workflow Examples
 
 ### Complete Campaign Creation Flow
 
@@ -486,9 +486,9 @@ Authorization: Bearer eyJhbGc...
 
 #### Step 3: Connect Facebook Page
 ```http
-GET /api/social-platforms/facebook/auth-url?storeId=store-guid
+GET /api/social-platforms/facebook/auth-url-storeId=store-guid
 ```
-User authorizes ? Facebook redirects ? Page connected
+User authorizes - Facebook redirects - Page connected
 
 #### Step 4: Create Campaign
 ```http
@@ -510,7 +510,7 @@ Authorization: Bearer eyJhbGc...
 X-Store-ID: store-guid
 {
   "campaignId": "campaign-guid",
-  "postCaption": "?? Spring Sale! 50% off all dresses!",
+  "postCaption": "-- Spring Sale! 50% off all dresses!",
   "postImageUrl": "https://example.com/spring-dress.jpg",
   "scheduledAt": "2024-03-05T10:00:00Z"
 }
@@ -519,13 +519,13 @@ X-Store-ID: store-guid
 #### Step 6: Automatic Publishing
 - Hangfire job runs every 5 minutes
 - At 2024-03-05 10:00 UTC, post is published to Facebook
-- `PublishStatus` ? `PublishStatus.Published` (stored as "Published")
-- `PublishedAt` ? actual publish time
-- `ExternalPostId` ? Facebook post ID
+- `PublishStatus` - `PublishStatus.Published` (stored as "Published")
+- `PublishedAt` - actual publish time
+- `ExternalPostId` - Facebook post ID
 
 ---
 
-## ?? Testing
+## -- Testing
 
 ### Unit Testing
 - Test services in isolation with mocked repositories
@@ -542,7 +542,7 @@ X-Store-ID: store-guid
 
 ---
 
-## ?? NuGet Packages
+## -- NuGet Packages
 
 ### Core Packages
 - `Microsoft.EntityFrameworkCore.SqlServer` - EF Core SQL Server provider
@@ -555,7 +555,7 @@ X-Store-ID: store-guid
 
 ---
 
-## ?? Configuration Reference
+## -- Configuration Reference
 
 ### appsettings.json Structure
 ```json
@@ -590,7 +590,7 @@ X-Store-ID: store-guid
 
 ---
 
-## ?? Common Issues & Solutions
+## -- Common Issues & Solutions
 
 ### Issue: "Store ID is required"
 **Solution**: Include `X-Store-ID` header in store-scoped endpoints
@@ -612,27 +612,27 @@ X-Store-ID: store-guid
 
 ---
 
-## ?? Future Enhancements
+## -- Future Enhancements
 
 ### Planned Features
-- ? Instagram Direct Publishing
-- ? Twitter/X Integration
-- ? LinkedIn Publishing
-- ? TikTok API Integration
-- ? Advanced Analytics Dashboard
-- ? AI-Generated Post Captions
-- ? Multi-Language Support
-- ? WhatsApp Business Integration
-- ? Email Marketing Campaigns
-- ? SMS Notifications
-- ? Calendar View for Scheduled Posts
-- ? Approval Workflow for Team Posts
-- ? Post Performance Tracking
-- ? A/B Testing for Campaigns
+- - Instagram Direct Publishing
+- - Twitter/X Integration
+- - LinkedIn Publishing
+- - TikTok API Integration
+- - Advanced Analytics Dashboard
+- - AI-Generated Post Captions
+- - Multi-Language Support
+- - WhatsApp Business Integration
+- - Email Marketing Campaigns
+- - SMS Notifications
+- - Calendar View for Scheduled Posts
+- - Approval Workflow for Team Posts
+- - Post Performance Tracking
+- - A/B Testing for Campaigns
 
 ---
 
-## ?? Team Collaboration Workflow
+## -- Team Collaboration Workflow
 
 ### For Store Owners
 1. Create store
@@ -648,7 +648,7 @@ X-Store-ID: store-guid
 
 ---
 
-## ?? Monitoring & Logging
+## -- Monitoring & Logging
 
 ### Hangfire Dashboard
 - View running jobs
@@ -663,28 +663,28 @@ X-Store-ID: store-guid
 
 ---
 
-## ?? Security Best Practices
+## -- Security Best Practices
 
 ### Implemented
-- ? JWT token authentication
-- ? Refresh token rotation
-- ? HTTPS enforcement
-- ? CORS configuration
-- ? SQL injection prevention (EF Core parameterized queries)
-- ? Soft delete for data retention
-- ? Store-level data isolation
+- - JWT token authentication
+- - Refresh token rotation
+- - HTTPS enforcement
+- - CORS configuration
+- - SQL injection prevention (EF Core parameterized queries)
+- - Soft delete for data retention
+- - Store-level data isolation
 
 ### Recommended for Production
-- ?? Rate limiting
-- ?? API key authentication for webhooks
-- ?? Data encryption at rest
-- ?? Regular security audits
-- ?? OWASP Top 10 compliance
-- ?? Penetration testing
+- -- Rate limiting
+- -- API key authentication for webhooks
+- -- Data encryption at rest
+- -- Regular security audits
+- -- OWASP Top 10 compliance
+- -- Penetration testing
 
 ---
 
-## ?? Support & Documentation
+## -- Support & Documentation
 
 ### Resources
 - **API Documentation**: `/swagger` endpoint
@@ -697,13 +697,13 @@ For questions or issues, create a GitHub issue or contact the development team.
 
 ---
 
-## ?? License
+## -- License
 
 [Specify your license here - MIT, Apache 2.0, etc.]
 
 ---
 
-## ?? Summary for AI Agents
+## -- Summary for AI Agents
 
 **Key Points:**
 1. **Architecture**: Clean Architecture with 4 layers (Domain, Application, Infrastructure, Presentation)
@@ -732,7 +732,7 @@ For questions or issues, create a GitHub issue or contact the development team.
 
 **Database Context:**
 - Primary: `SaasDbContext.cs`
-- Connection String: `appsettings.json` ? `ApplicationSqlConnection`
+- Connection String: `appsettings.json` - `ApplicationSqlConnection`
 
 **To Add New Social Platform:**
 1. Create `{Platform}Publisher.cs` implementing `ISocialPlatformPublisher`

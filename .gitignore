@@ -1,0 +1,27 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.dll
+*.exe
+
+# Visual Studio
+.vs/
+.vscode/
+
+# Node (frontend)
+node_modules/
+dist/
+.angular/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Internal docs (hide noisy files)
+backend/internal-docs/

@@ -7,7 +7,7 @@
 
 ---
 
-## ?? Table of Contents
+## -- Table of Contents
 
 1. [Authentication & Authorization](#authentication--authorization)
 2. [Global vs Store-Scoped Endpoints](#global-vs-store-scoped-endpoints)
@@ -19,7 +19,7 @@
 
 ---
 
-## ?? Authentication & Authorization
+## -- Authentication & Authorization
 
 ### JWT Token Management
 
@@ -46,7 +46,7 @@ headers: {
 
 ---
 
-## ?? Global vs Store-Scoped Endpoints
+## -- Global vs Store-Scoped Endpoints
 
 ### GLOBAL Endpoints (NO X-Store-ID header)
 - **Authentication**: `/api/auth/*`
@@ -70,7 +70,7 @@ headers: {
 
 ---
 
-## ?? API Endpoints Reference
+## -- API Endpoints Reference
 
 ### 1. Authentication (`/api/auth`) - GLOBAL
 
@@ -226,7 +226,7 @@ headers: {
 ]
 ```
 
-**?? Frontend Action**: After login, call this endpoint to populate store selection dropdown. Store selected store ID in localStorage:
+**-- Frontend Action**: After login, call this endpoint to populate store selection dropdown. Store selected store ID in localStorage:
 ```javascript
 localStorage.setItem('currentStoreId', selectedStore.id);
 ```
@@ -458,7 +458,7 @@ X-Store-ID: {storeId}
 **Headers**: `X-Store-ID: {storeId}`  
 **Query Params**: `inStockOnly` (bool, optional)
 
-**Example**: `GET /api/products?inStockOnly=true`
+**Example**: `GET /api/products-inStockOnly=true`
 
 **Response 200**:
 ```json
@@ -639,7 +639,7 @@ X-Store-ID: {storeId}
 **Headers**: `X-Store-ID: {storeId}`  
 **Query Params**: `status` (optional) - Filter by OrderStatus enum value
 
-**Example**: `GET /api/orders?status=Pending`
+**Example**: `GET /api/orders-status=Pending`
 
 **Response 200**:
 ```json
@@ -671,13 +671,13 @@ X-Store-ID: {storeId}
 - `Cancelled` - Order cancelled
 - `Refunded` - Order refunded
 
-**?? Note**: Status values are stored as **strings** in the database (not integers).
+**-- Note**: Status values are stored as **strings** in the database (not integers).
 
 **Example Query**:
 ```
-GET /api/orders?status=Pending
-GET /api/orders?status=Accepted
-GET /api/orders?status=Rejected
+GET /api/orders-status=Pending
+GET /api/orders-status=Accepted
+GET /api/orders-status=Rejected
 ```
 ---
 
@@ -758,7 +758,7 @@ GET /api/orders?status=Rejected
 **Business Rules**:
 - Order must exist
 - Order status must be Pending
-- Status changes from Pending ? Accepted
+- Status changes from Pending - Accepted
 - Order is preserved (not deleted)
 
 **Response 200**: Updated OrderDto with Status = Accepted  
@@ -783,7 +783,7 @@ GET /api/orders?status=Rejected
 **Business Rules**:
 - Order must exist
 - Order status must be Pending
-- Status changes from Pending ? Rejected
+- Status changes from Pending - Rejected
 - Order is preserved (not deleted) for record-keeping
 
 **Response 200**: Updated OrderDto with Status = Rejected  
@@ -797,7 +797,7 @@ GET /api/orders?status=Rejected
 }
 ```
 
-**?? Frontend Implementation**:
+**-- Frontend Implementation**:
 ```javascript
 // Accept order
 const acceptOrder = async (orderId) => {
@@ -825,7 +825,7 @@ const rejectOrder = async (orderId) => {
 
 // Get pending orders
 const getPendingOrders = async () => {
-  const response = await fetch('/api/orders?status=Pending', {
+  const response = await fetch('/api/orders-status=Pending', {
     headers: {
       'Authorization': `Bearer ${token}`,
       'X-Store-ID': storeId
@@ -994,7 +994,7 @@ const getPendingOrders = async () => {
 }
 ```
 
-**?? Important**: `platformIds` array creates platform-specific posts automatically
+**-- Important**: `platformIds` array creates platform-specific posts automatically
 
 **Response 201**: Created CampaignPostDto
 
@@ -1068,7 +1068,7 @@ const getPendingOrders = async () => {
 ]
 ```
 
-**?? Use this for platform selection dropdowns**
+**-- Use this for platform selection dropdowns**
 
 ---
 
@@ -1110,7 +1110,7 @@ const getPendingOrders = async () => {
 }
 ```
 
-**?? Use OAuth endpoints instead for production**
+**-- Use OAuth endpoints instead for production**
 
 ---
 
@@ -1131,7 +1131,7 @@ const getPendingOrders = async () => {
 **Response 200**: Created SocialPlatformDto  
 **Response 400**: Invalid token or connection failed
 
-**?? Frontend Flow**:
+**-- Frontend Flow**:
 1. Initiate Facebook OAuth (get access token from Facebook SDK)
 2. Send token to this endpoint
 3. Backend validates and stores connection
@@ -1270,7 +1270,7 @@ const getPendingOrders = async () => {
 [
   {
     "id": 1,
-    "question": "What are your business hours?",
+    "question": "What are your business hours-",
     "answer": "We're open Monday-Friday, 9 AM - 5 PM",
     "messageType": "Text",
     "storeId": 1,
@@ -1302,7 +1302,7 @@ const getPendingOrders = async () => {
 **Request Body**:
 ```json
 {
-  "question": "What are your business hours?",
+  "question": "What are your business hours-",
   "answer": "We're open Monday-Friday, 9 AM - 5 PM",
   "messageType": "Text"
 }
@@ -1321,7 +1321,7 @@ const getPendingOrders = async () => {
 **Request Body**: (all fields optional)
 ```json
 {
-  "question": "Updated question?",
+  "question": "Updated question-",
   "answer": "Updated answer"
 }
 ```
@@ -1342,7 +1342,7 @@ const getPendingOrders = async () => {
 
 ---
 
-## ?? Data Models & Enums
+## -- Data Models & Enums
 
 ### Enums Reference
 
@@ -1421,95 +1421,95 @@ enum MessageType {
 }
 ```
 
-**?? Important**: All enums are stored as **strings** in the database, not integers. Use the enum names directly in API requests.
+**-- Important**: All enums are stored as **strings** in the database, not integers. Use the enum names directly in API requests.
 
 ---
 
-## ?? Database Constraints & Cascades
+## -- Database Constraints & Cascades
 
 ### Critical Foreign Key Relationships
 
 #### Store Deletion
 **Cascade Deletes** (when store is deleted, these are also deleted):
-- ? Teams
-- ? Products
-- ? Campaigns
-- ? Campaign Posts
-- ? Customers
-- ? Orders
-- ? Social Platforms
-- ? Automation Tasks
-- ? Chatbot FAQs
+- - Teams
+- - Products
+- - Campaigns
+- - Campaign Posts
+- - Customers
+- - Orders
+- - Social Platforms
+- - Automation Tasks
+- - Chatbot FAQs
 
-**?? Frontend Warning**: Deleting a store will permanently remove ALL associated data. Show confirmation dialog.
+**-- Frontend Warning**: Deleting a store will permanently remove ALL associated data. Show confirmation dialog.
 
 ---
 
 #### Campaign Deletion
 **Cascade Deletes**:
-- ? Campaign Posts (all posts in campaign)
-- ? Campaign Post Platforms (platform-specific posts)
+- - Campaign Posts (all posts in campaign)
+- - Campaign Post Platforms (platform-specific posts)
 
 **Blocked if**:
 - Campaign has active scheduled posts
 
-**?? Frontend**: Check if campaign has posts before allowing deletion
+**-- Frontend**: Check if campaign has posts before allowing deletion
 
 ---
 
 #### Product Deletion
 **Blocked if**:
-- ? Product is assigned to active campaigns
-- ? Product is in existing orders
+- - Product is assigned to active campaigns
+- - Product is in existing orders
 
-**?? Frontend**: Show error message and list blocking dependencies
+**-- Frontend**: Show error message and list blocking dependencies
 
 ---
 
 #### Customer Deletion
 **Blocked if**:
-- ? Customer has orders
+- - Customer has orders
 
-**?? Frontend**: Show orders count and prevent deletion if > 0
+**-- Frontend**: Show orders count and prevent deletion if > 0
 
 ---
 
 #### Team Deletion
 **Cascade Deletes**:
-- ? Team Members (removes all memberships)
+- - Team Members (removes all memberships)
 
 ---
 
 #### Campaign Post Deletion
 **Cascade Deletes**:
-- ? Campaign Post Platforms (removes all platform-specific versions)
-- ? Related Automation Tasks
+- - Campaign Post Platforms (removes all platform-specific versions)
+- - Related Automation Tasks
 
 ---
 
 #### Social Platform Deletion
 **Blocked if**:
-- ? Platform has published posts
+- - Platform has published posts
 
-**?? Frontend**: Use "Disconnect" instead of "Delete" to preserve data
+**-- Frontend**: Use "Disconnect" instead of "Delete" to preserve data
 
 ---
 
-## ?? Business Flow
+## -- Business Flow
 
 ### 1. Initial Setup Flow
 
 ```
 1. User Registration/Login
-   ?
+   -
 2. Create Store (or select existing)
-   ?
+   -
 3. Store ID saved to localStorage
-   ?
+   -
 4. All subsequent requests include X-Store-ID header
 ```
 
-**?? Frontend Implementation**:
+**-- Frontend Implementation**:
 ```javascript
 // After login
 const response = await fetch('/api/auth/login', {
@@ -1535,24 +1535,24 @@ localStorage.setItem('currentStoreId', stores[0].id);
 
 ```
 1. Create/Select Product (assign to campaign)
-   ?
+   -
 2. Create Campaign (link to product)
-   ?
+   -
 3. Connect Social Platforms (Facebook OAuth)
-   ?
+   -
 4. Create Campaign Posts (assign platforms)
-   ?
+   -
 5. Schedule Posts (set scheduledTime)
-   ?
+   -
 6. Background Job publishes at scheduled time
 ```
 
 **Campaign Stages Progression**:
 ```
-Draft ? InReview ? Scheduled ? Ready ? Published
+Draft - InReview - Scheduled - Ready - Published
 ```
 
-**?? Frontend**: Update campaign stage as user completes steps
+**-- Frontend**: Update campaign stage as user completes steps
 
 ---
 
@@ -1560,28 +1560,28 @@ Draft ? InReview ? Scheduled ? Ready ? Published
 
 ```
 1. User connects Facebook via OAuth
-   ?
+   -
 2. Create Campaign Post with platformIds
-   ?
+   -
 3. Backend creates CampaignPostPlatform entries
-   ?
+   -
 4. Hangfire background job runs every 1 minute
-   ?
+   -
 5. Job finds posts with scheduledTime <= now
-   ?
+   -
 6. Publishes to each platform
-   ?
+   -
 7. Updates PublishStatus (Published/Failed)
 ```
 
 **Post Status Transitions**:
 ```
-Draft ? Scheduled ? Publishing ? Published/Failed
+Draft - Scheduled - Publishing - Published/Failed
 ```
 
 **Publish Status Transitions**:
 ```
-Pending ? Publishing ? Published/Failed
+Pending - Publishing - Published/Failed
 ```
 
 ---
@@ -1590,15 +1590,15 @@ Pending ? Publishing ? Published/Failed
 
 ```
 1. Store Owner creates Team
-   ?
+   -
 2. Owner invites Users by email/userId
-   ?
+   -
 3. Assign Role (Owner/Moderator/Member)
-   ?
+   -
 4. Team members gain access to store resources
 ```
 
-**?? Frontend**: Implement role-based UI permissions
+**-- Frontend**: Implement role-based UI permissions
 
 ---
 
@@ -1606,17 +1606,17 @@ Pending ? Publishing ? Published/Failed
 
 ```
 1. Create Customer
-   ?
+   -
 2. Create Order (link to customer)
-   ?
+   -
 3. Add Products to Order (via OrderProducts)
-   ?
-4. Update Order Status (Pending ? Processing ? Shipped ? Delivered)
+   -
+4. Update Order Status (Pending - Processing - Shipped - Delivered)
 ```
 
 ---
 
-## ?? Error Handling
+## -- Error Handling
 
 ### Standard Error Responses
 
@@ -1696,7 +1696,7 @@ async function apiRequest(url, options) {
 
 ---
 
-## ?? Important Notes
+## -- Important Notes
 
 ### 1. Store Context Management
 **CRITICAL**: Always include `X-Store-ID` header for store-scoped endpoints.
@@ -1757,42 +1757,42 @@ Only Facebook OAuth is fully implemented. Instagram/TikTok/YouTube are placehold
 
 ---
 
-## ?? Recommended Frontend Structure
+## -- Recommended Frontend Structure
 
 ```
 src/
-??? api/
-?   ??? auth.js          // Authentication API calls
-?   ??? stores.js        // Store management
-?   ??? campaigns.js     // Campaign operations
-?   ??? posts.js         // Campaign posts
-?   ??? products.js      // Product management
-?   ??? customers.js     // Customer management
-?   ??? orders.js        // Order management
-?   ??? teams.js         // Team management
-?   ??? platforms.js     // Social platform connections
-?
-??? context/
-?   ??? AuthContext.js   // Auth state (token, user)
-?   ??? StoreContext.js  // Current store state
-?
-??? components/
-?   ??? auth/
-?   ??? dashboard/
-?   ??? campaigns/
-?   ??? products/
-?   ??? orders/
-?   ??? settings/
-?
-??? utils/
-    ??? apiClient.js     // Axios/fetch wrapper with interceptors
-    ??? dateUtils.js     // Date formatting
-    ??? constants.js     // Enums, API URLs
+--- api/
+-   --- auth.js          // Authentication API calls
+-   --- stores.js        // Store management
+-   --- campaigns.js     // Campaign operations
+-   --- posts.js         // Campaign posts
+-   --- products.js      // Product management
+-   --- customers.js     // Customer management
+-   --- orders.js        // Order management
+-   --- teams.js         // Team management
+-   --- platforms.js     // Social platform connections
+-
+--- context/
+-   --- AuthContext.js   // Auth state (token, user)
+-   --- StoreContext.js  // Current store state
+-
+--- components/
+-   --- auth/
+-   --- dashboard/
+-   --- campaigns/
+-   --- products/
+-   --- orders/
+-   --- settings/
+-
+--- utils/
+    --- apiClient.js     // Axios/fetch wrapper with interceptors
+    --- dateUtils.js     // Date formatting
+    --- constants.js     // Enums, API URLs
 ```
 
 ---
 
-## ?? Key Frontend Features to Implement
+## -- Key Frontend Features to Implement
 
 1. **Login/Registration**
 2. **Store Selection Dropdown** (persistent in header)
@@ -1812,7 +1812,7 @@ src/
 
 ---
 
-## ?? Support & Documentation
+## -- Support & Documentation
 
 - **API Base URL**: Update in your environment config
 - **Swagger Documentation**: Available at `/swagger` (if enabled)

@@ -1,188 +1,103 @@
-﻿# Clean Architecture Pattern - GetAllProducts Example
+# Architecture Overview
 
-This document explains how the **GetAllProducts** use case works across all layers.
+This backend is a layered .NET 8 API built around clean separation of concerns, with explicit handling for multi-tenant store context.
 
-## 🎯 Architecture Overview
+The design is practical rather than academic: controllers stay thin, business logic lives in application services, and data access is isolated in repositories behind a Unit of Work.
 
-\\\
-Request Flow:
-1. HTTP Request → ProductController (Presentation)
-2. Controller → MediatR → GetAllProductsHandler (Application)
-3. Handler → IProductRepository → ProductRepository (Infrastructure)
-4. Repository → Database (or Mock data)
-5. Response flows back up the chain
-\\\
+## Solution Structure
 
-## 📁 File Structure
+- **Presentation**
+  - ASP.NET Core Web API entry point and HTTP pipeline.
+  - Controllers define endpoints and delegate work to application services.
+  - Middleware handles cross-cutting concerns such as exception handling and store context validation.
 
-\\\
-Domain/
-└── Entities/
-    └── Product.cs              ← Domain entity with business logic
+- **Application**
+  - Use-case oriented services (`ProductService`, `OrderService`, `CampaignService`, etc.).
+  - DTO contracts and mapping profiles.
+  - Interfaces that define boundaries (`IUnitOfWork`, repository interfaces, service interfaces).
+  - Business orchestration for publishing workflows.
 
-Application/
-├── DTOs/Products/
-│   └── ProductDto.cs           ← Data transfer objects
-├── Common/Interfaces/
-│   └── IProductRepository.cs   ← Repository contract
-└── Features/Products/
-    ├── Queries/
-    │   └── GetAllProductsQuery.cs    ← Query request
-    └── Handlers/
-        └── GetAllProductsHandler.cs  ← Query handler (business logic)
+- **Domain**
+  - Core entities (`Store`, `Product`, `Order`, `Campaign`, ...).
+  - Enums and base entity model (including soft-delete fields).
+  - No dependency on infrastructure frameworks.
 
-Infrastructure/
-└── Repositories/
-    ├── ProductRepository.cs          ← Real DB implementation
-    └── MockProductRepository.cs      ← Mock for testing
+- **Infrastructure**
+  - Entity Framework Core implementation (`SaasDbContext`) and SQL Server persistence.
+  - Repository implementations and Unit of Work implementation.
+  - External integrations (social publishers, embedding webhook, current user/store services).
+  - Background job host components (Hangfire jobs).
 
-Presentation/
-└── Controllers/
-    └── ProductController.cs          ← API endpoints
-\\\
+## Runtime Architecture
 
-## 🔄 Request Flow Example
+### Request Pipeline
 
-### 1. Client Makes Request
-\\\http
-GET /api/product?storeId=1&inStockOnly=true
-\\\
+1. Request enters ASP.NET Core pipeline.
+2. `ExceptionMiddleware` catches and normalizes unhandled errors.
+3. `StoreContextMiddleware` reads `X-Store-ID` (when present) and stores it in scoped `StoreContext`.
+4. JWT authentication and authorization run.
+5. `StoreValidationMiddleware` confirms the authenticated user can access the selected store for store-scoped routes.
+6. Controller executes and calls application service.
+7. Application service uses Unit of Work/repositories and returns DTO response.
 
-### 2. Controller Receives Request
-\\\csharp
-// ProductController.cs
-[HttpGet]
-public async Task<IActionResult> GetAllProducts(int? storeId, bool? inStockOnly)
-{
-    var query = new GetAllProductsQuery { StoreId = storeId, InStockOnly = inStockOnly };
-    var response = await _mediator.Send(query); // MediatR routes to handler
-    return Ok(response);
-}
-\\\
+### Multi-Tenant Data Isolation
 
-### 3. MediatR Routes to Handler
-\\\csharp
-// GetAllProductsHandler.cs
-public async Task<GetProductsResponse> Handle(GetAllProductsQuery request, ...)
-{
-    // 1. Get data from repository
-    var products = await _productRepository.GetAllAsync();
-    
-    // 2. Apply filters
-    if (request.InStockOnly) products = products.Where(p => p.InStock);
-    
-    // 3. Map to DTOs
-    var dtos = products.Select(p => new ProductDto { ... });
-    
-    // 4. Return response
-    return new GetProductsResponse { Products = dtos };
-}
-\\\
+The project uses two layers of tenant protection:
 
-### 4. Repository Fetches Data
-\\\csharp
-// MockProductRepository.cs (or ProductRepository.cs with DB)
-public Task<List<Product>> GetAllAsync()
-{
-    return Task.FromResult(_fakeProducts); // Mock data
-    // OR: return await _context.Products.ToListAsync(); // Real DB
-}
-\\\
+- **Request-level validation**
+  - `StoreValidationMiddleware` checks whether the current user owns the store or is a team member.
 
-### 5. Response Returns to Client
-\\\json
-{
-  "products": [
-    {
-      "id": 1,
-      "name": "Laptop",
-      "price": 999.99,
-      "inStock": true
-    }
-  ],
-  "totalCount": 1,
-  "message": "Successfully retrieved 1 product(s)"
-}
-\\\
+- **Data-level filtering**
+  - `SaasDbContext` applies global query filters that combine:
+    - soft delete (`IsDeleted == false`)
+    - store scoping (`entity.StoreId == current StoreId` when store context exists)
 
-## 🎨 Design Patterns Used
+This means most repository queries stay simple while still respecting tenant boundaries.
 
-### 1. **CQRS (Command Query Responsibility Segregation)**
-- Queries (read) separated from Commands (write)
-- \GetAllProductsQuery\ is a query - it doesn't modify data
+## Data Access Pattern
 
-### 2. **Mediator Pattern**
-- MediatR decouples controllers from handlers
-- Controller doesn't know which handler executes the query
+The application uses **Repository + Unit of Work** over EF Core:
 
-### 3. **Repository Pattern**
-- \IProductRepository\ abstracts data access
-- Easy to switch between Mock and Real implementations
+- Repositories expose aggregate-specific operations (for example, product search or due campaign posts).
+- `IUnitOfWork` provides a consistent access point to repositories and a single `SaveChangesAsync` boundary.
+- Services coordinate business operations and persistence in one place.
 
-### 4. **Dependency Inversion**
-- Application layer defines \IProductRepository\ interface
-- Infrastructure layer implements it
-- High-level modules don't depend on low-level modules
+This keeps controllers lightweight and avoids leaking EF Core concerns into the API layer.
 
-## 🚀 How to Add a New Use Case
+## Example Flow: Products Endpoint
 
-Follow this pattern for any new feature:
+`GET /api/products`
 
-### Example: Create "GetProductById" 
+- `ProductController` receives the request.
+- `ProductService.GetAllAsync()` executes business rules (like optional `inStockOnly` filtering).
+- `UnitOfWork.Products.GetAllAsync()` loads data.
+- EF global query filters automatically apply store and soft-delete constraints.
+- Service maps entities to DTOs and returns a response model.
 
-1. **Create Query** (\Application/Features/Products/Queries/\):
-\\\csharp
-public record GetProductByIdQuery(int Id) : IRequest<ProductDto>;
-\\\
+For writes (`POST`/`PUT`), `ProductService` also triggers a non-blocking embedding webhook call after persistence.
 
-2. **Create Handler** (\Application/Features/Products/Handlers/\):
-\\\csharp
-public class GetProductByIdHandler : IRequestHandler<GetProductByIdQuery, ProductDto>
-{
-    private readonly IProductRepository _repository;
-    
-    public async Task<ProductDto> Handle(GetProductByIdQuery request, ...)
-    {
-        var product = await _repository.GetByIdAsync(request.Id);
-        return new ProductDto { ... };
-    }
-}
-\\\
+## Background Processing and Integrations
 
-3. **Add Controller Endpoint**:
-\\\csharp
-[HttpGet("{id}")]
-public async Task<IActionResult> GetById(int id)
-{
-    var result = await _mediator.Send(new GetProductByIdQuery(id));
-    return Ok(result);
-}
-\\\
+- **Hangfire** is configured for recurring background work.
+- `PlatformPublisherJob` runs on a schedule and delegates publishing logic to `PlatformPublishingService`.
+- Platform-specific publishing is abstracted behind `ISocialPlatformPublisher` implementations.
+- External HTTP integrations use `IHttpClientFactory`.
 
-4. **Test** - That's it! MediatR wires everything automatically.
+This keeps heavy or time-based operations out of synchronous request paths.
 
-## 📚 Key Benefits
+## Security and API Concerns
 
-✅ **Testable** - Mock repository for unit tests  
-✅ **Maintainable** - Each layer has clear responsibility  
-✅ **Scalable** - Easy to add new features following the same pattern  
-✅ **Flexible** - Swap implementations without changing business logic  
+- JWT Bearer authentication with configured issuer/audience/signing key.
+- Identity integration via `IdentityDbContext<User, IdentityRole<Guid>, Guid>`.
+- Swagger/OpenAPI with bearer security definition.
+- Store header support in API docs via operation filter.
 
-## 🔧 Switching from Mock to Real Database
+## Why This Architecture Works Well
 
-In \Program.cs\, change:
-\\\csharp
-// From:
-builder.Services.AddScoped<IProductRepository, MockProductRepository>();
+- Clear boundaries between HTTP, business logic, domain model, and persistence.
+- Strong tenant isolation strategy for a multi-store SaaS model.
+- Predictable and testable service/repository composition.
+- Extensible integration model for social publishing and external automation.
+- Background processing for long-running or scheduled tasks without blocking API requests.
 
-// To:
-builder.Services.AddScoped<IProductRepository, ProductRepository>();
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(connectionString));
-\\\
-
-## 📖 Further Reading
-
-- [Clean Architecture by Uncle Bob](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html)
-- [MediatR Documentation](https://github.com/jbogard/MediatR)
-- [Repository Pattern](https://docs.microsoft.com/en-us/dotnet/architecture/microservices/microservice-ddd-cqrs-patterns/infrastructure-persistence-layer-design)
+In short, the system is organized for maintainability and production operations: straightforward request handling, explicit business orchestration, and controlled infrastructure dependencies.

@@ -1,12 +1,12 @@
 # Unit of Work Pattern - Implementation Guide
 
-## ?? Overview
+## -- Overview
 
 The Unit of Work pattern has been implemented to manage database transactions across multiple repositories. It ensures data consistency by grouping multiple operations into a single transaction.
 
 ---
 
-## ??? Structure
+## --- Structure
 
 ### Files Created:
 1. **`Application/Common/Interfaces/IUnitOfWork.cs`** - Interface definition
@@ -16,23 +16,23 @@ The Unit of Work pattern has been implemented to manage database transactions ac
 
 ---
 
-## ?? Key Concepts
+## -- Key Concepts
 
-### What is Unit of Work?
+### What is Unit of Work-
 - **Groups multiple repository operations** into a single transaction
 - **Ensures atomicity** - all operations succeed or all fail together
 - **Single SaveChanges()** call at the end
 - **Manages DbContext lifecycle**
 
-### When to Use?
-- ? **Multi-repository operations** (e.g., creating order + order items)
-- ? **Complex business transactions** (e.g., transfer money between accounts)
-- ? **Ensuring data consistency** across related entities
-- ? Simple single-entity CRUD (repository alone is fine)
+### When to Use-
+- - **Multi-repository operations** (e.g., creating order + order items)
+- - **Complex business transactions** (e.g., transfer money between accounts)
+- - **Ensuring data consistency** across related entities
+- - Simple single-entity CRUD (repository alone is fine)
 
 ---
 
-## ?? Usage Examples
+## -- Usage Examples
 
 ### Example 1: Simple Operation (Single Repository)
 
@@ -103,7 +103,7 @@ public async Task<OrderDto> CreateOrderWithProductsAsync(...)
 
 ---
 
-## ?? Available Repositories in UnitOfWork
+## -- Available Repositories in UnitOfWork
 
 ```csharp
 _unitOfWork.Products
@@ -122,7 +122,7 @@ _unitOfWork.ChatbotFAQs
 
 ---
 
-## ?? Available Methods
+## -- Available Methods
 
 ### Transaction Control:
 ```csharp
@@ -143,24 +143,24 @@ _unitOfWork.Dispose();
 
 ---
 
-## ?? When to Use SaveChangesAsync vs Explicit Transactions
+## -- When to Use SaveChangesAsync vs Explicit Transactions
 
 ### Use `SaveChangesAsync()` for:
-- ? Single entity operations
-- ? Simple CRUD
-- ? Operations within same aggregate
+- - Single entity operations
+- - Simple CRUD
+- - Operations within same aggregate
 - **EF Core automatically wraps in transaction**
 
 ```csharp
 var product = await _unitOfWork.Products.AddAsync(product);
-await _unitOfWork.SaveChangesAsync(); // ? Automatic transaction
+await _unitOfWork.SaveChangesAsync(); // - Automatic transaction
 ```
 
 ### Use `BeginTransaction/Commit/Rollback` for:
-- ? Multiple unrelated entities
-- ? Complex multi-step workflows
-- ? Need to rollback on business rule violations
-- ? Custom error handling per step
+- - Multiple unrelated entities
+- - Complex multi-step workflows
+- - Need to rollback on business rule violations
+- - Custom error handling per step
 
 ```csharp
 await _unitOfWork.BeginTransactionAsync();
@@ -174,7 +174,7 @@ try {
 
 ---
 
-## ?? Migration Guide for Existing Services
+## -- Migration Guide for Existing Services
 
 ### Before (Direct Repository Injection):
 ```csharp
@@ -209,17 +209,17 @@ public class ProductService : IProductService
     public async Task CreateAsync(...)
     {
         await _unitOfWork.Products.AddAsync(product);
-        await _unitOfWork.SaveChangesAsync(); // ? Explicit save
+        await _unitOfWork.SaveChangesAsync(); // - Explicit save
     }
 }
 ```
 
 ---
 
-## ?? Important Notes
+## -- Important Notes
 
 ### 1. Repository SaveChanges
-?? **Current repositories call `SaveChangesAsync()` internally**
+-- **Current repositories call `SaveChangesAsync()` internally**
 
 You need to **update repositories** to NOT call SaveChanges:
 
@@ -228,7 +228,7 @@ You need to **update repositories** to NOT call SaveChanges:
 public async Task<Product> AddAsync(Product product)
 {
     _context.Products.Add(product);
-    await _context.SaveChangesAsync(); // ? Remove this
+    await _context.SaveChangesAsync(); // - Remove this
     return product;
 }
 
@@ -250,7 +250,7 @@ Repositories are created **only when accessed** for better performance.
 
 ---
 
-## ? Next Steps
+## - Next Steps
 
 1. **Update remaining services** to use `IUnitOfWork`
 2. **Refactor repositories** to remove internal `SaveChangesAsync()` calls
@@ -260,7 +260,7 @@ Repositories are created **only when accessed** for better performance.
 
 ---
 
-## ?? Additional Resources
+## -- Additional Resources
 
 - [Unit of Work Pattern - Martin Fowler](https://martinfowler.com/eaaCatalog/unitOfWork.html)
 - [EF Core Transactions](https://learn.microsoft.com/en-us/ef/core/saving/transactions)
