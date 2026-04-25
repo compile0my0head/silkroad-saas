@@ -1,491 +1,270 @@
-# -- Architecture Diagrams: Product Embedding & Chatbot Orders
+# Architecture Diagrams and System Design
 
-## --- System Overview
+This document explains how the current backend is organized and how requests move through the system.
 
-```
--------------------------------------------------------------------
--                         PRESENTATION LAYER                       -
--------------------------------------------------------------------
--                                                                  -
--  --------------------              -----------------------     -
--  - ProductController-              -  OrderController     -     -
--  -                  -              -                      -     -
--  - POST /products   -              - POST /orders/chatbot -     -
--  - PUT /products/:id-              -   [AllowAnonymous]   -     -
--  --------------------              -----------------------     -
--           -                                    -                 -
---------------------------------------------------------------------
-            -                                    -
-            -                                    -
--------------------------------------------------------------------
--                        APPLICATION LAYER                         -
--------------------------------------------------------------------
--                                                                  -
--  --------------------              -----------------------     -
--  -  ProductService  -              - ChatbotOrderService -     -
--  -                  -              -                      -     -
--  - CreateAsync()    -              - ProcessChatbotOrder()-     -
--  - UpdateAsync()    -              -                      -     -
--  --------------------              -----------------------     -
--           -                                    -                 -
--           -  -----------------------          -                 -
--           ----IProductEmbeddingServ-          -                 -
--              -                     -          -                 -
--              -  EmbedProductAsync()-          -                 -
--              -----------------------          -                 -
--                                               -                 -
--              ------------------------------------------------- -
--              -         IUnitOfWork             -             - -
--              -                                 -             - -
--              -  ---------------  ------------ -             - -
--              -  -Products     -  -Customers - -             - -
--              -  ---------------  ------------ -             - -
--              -  ---------------  ------------ -             - -
--              -  -Orders       -  -Platforms - -             - -
--              -  ---------------  ------------ -             - -
--              -----------------------------------             - -
--------------------------------------------------------------------
-            -                                    -
-            -                                    -
--------------------------------------------------------------------
--                      INFRASTRUCTURE LAYER                        -
--------------------------------------------------------------------
--                                                                  -
--  ------------------------         ------------------------     -
--  -ProductEmbeddingService-         -    Repositories       -     -
--  -                       -         -                       -     -
--  - HttpClient           -         - CustomerRepository    -     -
--  - -- POST to n8n       -         - ProductRepository     -     -
--  - -- 10s timeout       -         - SocialPlatformRepo    -     -
--  - -- Error logging     -         - OrderRepository       -     -
--  -------------------------         ------------------------     -
--              -                                 -                 -
--              -                                 -                 -
--  ------------------------         ------------------------     -
--  -  n8n Webhook         -         -   SQL Server DB       -     -
--  -  (External)          -         -                       -     -
--  ------------------------         ------------------------     -
--                                                                  -
--------------------------------------------------------------------
+It is written as a quick technical walkthrough for reviewers.
+
+---
+
+## 1) System at a Glance
+
+Simple flow:
+
+Facebook -> n8n -> Backend (.NET) -> Database -> Frontend
+
+```mermaid
+flowchart LR
+  Client[Web Frontend / Admin UI]
+  N8N[n8n Workflows]
+
+  subgraph API[ASP.NET Core API]
+    MW[Middleware Pipeline]
+    CTR[Controllers]
+    APP[Application Services]
+  end
+
+  subgraph Infra[Infrastructure]
+    UOW[Unit of Work + Repositories]
+    DB[(SQL Server)]
+    BG[Hangfire Jobs]
+    EXT[External Integrations]
+  end
+
+  Client --> MW --> CTR --> APP --> UOW --> DB
+  APP --> EXT
+  N8N -->|POST /api/orders/chatbot| CTR
+  BG --> APP
 ```
 
 ---
 
-## -- Product Embedding Flow
+## 2) Layered Architecture
 
-```
---------------
--  Frontend  -
--            -
-- Creates or -
-- Updates    -
-- Product    -
---------------
-      - POST /api/products
-      - Authorization: Bearer {token}
-      - X-Store-ID: {storeId}
-      -
-      -
--------------------
--ProductController-
--------------------
-         -
-         -
--------------------
-- ProductService  -
--                 -
-- 1. Map request  -
-- 2. Add to DB    -
-- 3. SaveChanges()- -------
--------------------        -
-         -                 -
-         - Fire-and-forget -
-         -                 -
-----------------------------
-- Task.Run(async () =>    --
--   await Embed()         --
-- )                       --
-----------------------------
-         -                 -
-         -                 -
-------------------------------------------
-- ProductEmbeddingService  -             -
--                          -             -
-- 1. Build payload         -   Main      -
-- 2. POST to n8n webhook   -   Thread    -
-- 3. Handle errors         -   Returns   -
-- 4. Log result            -   Here      -
-------------------------------------------
-         -
-         -
-----------------------------
--   n8n Webhook            -
--   (Vector Embedding)     -
--                          -
--   Stores product data    -
--   for semantic search    -
-----------------------------
+```mermaid
+flowchart TB
+  subgraph Presentation
+    P1[Program.cs]
+    P2[Controllers]
+    P3[Exception + Store Middleware]
+  end
+
+  subgraph Application
+    A1[Use-case Services]
+    A2[DTOs + Mapping]
+    A3[Interfaces: IUnitOfWork, Repositories, Services]
+  end
+
+  subgraph Domain
+    D1[Entities]
+    D2[Enums]
+    D3[BaseEntity + Soft Delete]
+  end
+
+  subgraph Infrastructure
+    I1[EF Core DbContext]
+    I2[Repository Implementations]
+    I3[UnitOfWork Implementation]
+    I4[External Services + Publishers]
+  end
+
+  Presentation --> Application
+  Application --> Domain
+  Infrastructure --> Domain
+  Presentation --> Infrastructure
+  Application --> Infrastructure
 ```
 
-**Key Points**:
-- - Non-blocking
-- - Failures don't affect product operations
-- - Background execution
-- - Detailed logging
+### Responsibility split
+
+- **Presentation**: HTTP contract, middleware, auth flow, endpoint exposure.
+- **Application**: business rules, orchestration, transaction boundary coordination.
+- **Domain**: core business model independent of frameworks.
+- **Infrastructure**: persistence and external systems.
 
 ---
 
-## -- Chatbot Order Flow
+## 3) Request Pipeline (Store-Scoped APIs)
 
-```
-----------------
--   n8n        -
--   Workflow   -
--              -
-- Facebook     -
-- Messenger    -
-----------------
-       - POST /api/orders/chatbot
-       - {customer, items, pageId}
-       - NO AUTHENTICATION
-       -
-       -
---------------------
-- OrderController  -
-- [AllowAnonymous] -
---------------------
-         -
-         -
------------------------------------------------
--         ChatbotOrderService                  -
--                                              -
--  ------------------------------------------ -
--  - Step 1: Resolve Store                  - -
--  - pageId - SocialPlatforms.ExternalPageID- -
--  -        - StoreId                        - -
--  ------------------------------------------ -
--                                              -
--  ------------------------------------------ -
--  - Step 2: Find/Create Customer           - -
--  -                                         - -
--  - ---------------------------------------- -
--  - - Try: Find by PSID                   -- -
--  - ---------------------------------------- -
--  -                                         - -
--  - ---------------------------------------- -
--  - - If not found: Find by Phone         -- -
--  - -               Update PSID            -- -
--  - ---------------------------------------- -
--  -                                         - -
--  - ---------------------------------------- -
--  - - If not found: Create New            -- -
--  - -               (name or "Anonymous") -- -
--  - ---------------------------------------- -
--  ------------------------------------------ -
--                                              -
--  ------------------------------------------ -
--  - Step 3: Match Products                 - -
--  -                                         - -
--  - For each item:                          - -
--  -   Search by name (LIKE)                 - -
--  -   If found: Add to order                - -
--  -   If not:   Skip, log warning           - -
--  ------------------------------------------ -
--                                              -
--  ------------------------------------------ -
--  - Step 4: Create Order                   - -
--  -                                         - -
--  - Status: Pending (always)                - -
--  - TotalPrice: Sum of matched products     - -
--  ------------------------------------------ -
--                                              -
--  ------------------------------------------ -
--  - Step 5: Create OrderProducts           - -
--  -                                         - -
--  - For each matched product:               - -
--  -   Create OrderProduct record            - -
--  ------------------------------------------ -
--                                              -
-------------------------------------------------
-             -
-             -
---------------------------------------------------
--              Database                           -
--                                                 -
--  ------------  ---------  ----------------   -
--  -Customers -  -Orders -  -OrderProducts -   -
--  ------------  ---------  ----------------   -
--                                                 -
----------------------------------------------------
+```mermaid
+sequenceDiagram
+  participant C as Client
+  participant M1 as ExceptionMiddleware
+  participant M2 as StoreContextMiddleware
+  participant A as AuthN/AuthZ
+  participant M3 as StoreValidationMiddleware
+  participant CT as Controller
+  participant S as Application Service
+  participant R as UnitOfWork/Repository
+  participant DB as SQL Server
+
+  C->>M1: HTTP request
+  M1->>M2: pass through
+  M2->>M2: read X-Store-ID
+  M2->>A: pass through
+  A->>M3: authenticated context
+  M3->>M3: validate user-store access
+  M3->>CT: continue
+  CT->>S: execute application service
+  S->>R: fetch data (EF Core)
+  R->>DB: EF Core operations
+  DB-->>R: result
+  R-->>S: entities
+  S-->>CT: map to DTO
+  CT-->>C: HTTP response
 ```
 
 ---
 
-## --- Database Relationship Diagram
+## 3.1) System Flow
 
-```
------------------------
--   SocialPlatforms   -
--                     -
-- � ExternalPageID  ---------
-- � StoreId           -     -
-- � PlatformName      -     -
------------------------     -
-                            -
-                            - Used to
-                            - resolve
-                            - StoreId
-                            -
------------------------     -
--      Customers      -     -
--                     -     -
-- � PSID (indexed)    -     -
-- � Phone             -     -
-- � CustomerName      -     -
-- � BillingAddress    -     -
-- � StoreI-------------------
------------------------
-           -
-           - 1:N
-           -
-           -
------------------------
--       Orders        -
--                     -
-- � Status (Pending)  -
-- � TotalPrice        -
-- � CustomerId        -
-- � StoreId           -
------------------------
-           -
-           - 1:N
-           -
-           -
------------------------       -----------------------
--   OrderProducts     - N:1   -      Products       -
--                     ---------                     -
-- � Quantity          -       - � ProductName       -
-- � UnitPrice         -       - � ProductPrice      -
-- � OrderId           -       - � StoreId           -
-- � ProductId         -     -------------------------
------------------------
-```
+1. Customer sends a message via Facebook.
+2. n8n processes the message and prepares a structured order payload.
+3. Backend receives the order through `POST /api/orders/chatbot`.
+4. The order is stored in SQL Server and linked to the correct store.
+5. Admin reviews the new order in the dashboard.
 
 ---
 
-## -- Security & Validation Flow
+## 4) Product Flow with Async Embedding
 
-```
----------------------------------------------------------------
--                    Product Embedding                         -
----------------------------------------------------------------
--                                                              -
--  ----------------                                           -
--  - JWT Token    - - Required                               -
--  ----------------                                           -
--                                                              -
--  ----------------                                           -
--  - X-Store-ID   - - Required                               -
--  ----------------                                           -
--                                                              -
--  ----------------                                           -
--  - Product Data - - Validated via DTOs                     -
--  ----------------                                           -
--                                                              -
----------------------------------------------------------------
+```mermaid
+sequenceDiagram
+  participant C as Frontend
+  participant PC as ProductController
+  participant PS as ProductService
+  participant U as UnitOfWork
+  participant DB as SQL Server
+  participant ES as ProductEmbeddingService
+  participant W as n8n Webhook
 
----------------------------------------------------------------
--                    Chatbot Orders                            -
----------------------------------------------------------------
--                                                              -
--  ----------------                                           -
--  - Authentication- - None (Public endpoint)                -
--  ----------------                                           -
--                                                              -
--  ----------------                                           -
--  - PageId       - - Must exist in SocialPlatforms          -
--  ----------------                                           -
--                                                              -
--  ----------------                                           -
--  - Customer PSID- - Required                               -
--  ----------------                                           -
--                                                              -
--  ----------------                                           -
--  - Items array  - - Min 1, Quantity > 0                    -
--  ----------------                                           -
--                                                              -
--  ----------------                                           -
--  - Validation   - - DataAnnotations + ModelState           -
--  ----------------                                           -
--                                                              -
----------------------------------------------------------------
+  C->>PC: POST /api/products + JWT + X-Store-ID
+  PC->>PS: CreateAsync(request)
+  PS->>PS: inject StoreId from StoreContext
+  PS->>U: Products.AddAsync
+  PS->>U: SaveChangesAsync
+  U->>DB: INSERT Product
+  DB-->>U: committed
+  U-->>PS: created product
+  PS-->>PC: ProductDto
+  PC-->>C: 201 Created
+
+  Note over PS,ES: Fire-and-forget embedding call
+  PS->>ES: EmbedProductAsync(product)
+  ES->>W: POST product payload
 ```
+
+Why this matters:
+
+- API latency is not blocked by embedding webhook execution.
+- Product write path remains resilient even if integration is unavailable.
 
 ---
 
-## - Error Handling Flow
+## 5) Chatbot Order Intake (n8n -> API)
 
-```
----------------------------------------------------------------
--                Product Embedding Errors                      -
----------------------------------------------------------------
--                                                              -
--  HTTP Timeout (>10s)                                         -
--      -                                                       -
--      --- Log Warning --- Continue                          -
--                                                              -
--  Network Error                                               -
--      -                                                       -
--      --- Log Error ----- Continue                          -
--                                                              -
--  Webhook Returns 4xx/5xx                                     -
--      -                                                       -
--      --- Log Warning --- Continue                          -
--                                                              -
--  - Product operation ALWAYS succeeds                        -
--                                                              -
----------------------------------------------------------------
+```mermaid
+sequenceDiagram
+  participant N as n8n
+  participant OC as OrderController
+  participant CS as ChatbotOrderService
+  participant U as UnitOfWork
+  participant DB as SQL Server
 
----------------------------------------------------------------
--                Chatbot Order Errors                          -
----------------------------------------------------------------
--                                                              -
--  Invalid PageId                                              -
--      -                                                       -
--      --- 400 Bad Request                                    -
--      --- "Page not connected to any store"                  -
--                                                              -
--  Validation Error                                            -
--      -                                                       -
--      --- 400 Bad Request                                    -
--      --- ModelState errors                                  -
--                                                              -
--  Product Not Found                                           -
--      -                                                       -
--      --- Log Warning --- Skip item --- Continue            -
--                                                              -
--  Database Error                                              -
--      -                                                       -
--      --- 500 Internal Server Error                         -
--      --- Error logged                                       -
--                                                              -
----------------------------------------------------------------
+  N->>OC: POST /api/orders/chatbot
+  OC->>CS: ProcessChatbotOrderAsync
+
+  CS->>U: SocialPlatforms.GetByPageId
+  U->>DB: resolve StoreId from ExternalPageID
+  DB-->>U: SocialPlatform
+
+  CS->>U: find/create Customer (PSID/Phone)
+  CS->>U: match Products by name
+  CS->>U: create Order (Status=Pending)
+  CS->>U: create OrderProducts
+  CS->>U: SaveChangesAsync
+
+  U->>DB: transaction write
+  DB-->>U: committed
+  CS-->>OC: Order response
+  OC-->>N: 201 Created
 ```
+
+Design intent:
+
+- n8n handles conversation logic.
+- API handles persistence, validation, and order lifecycle initiation.
 
 ---
 
-## -- Request/Response Flow
+## 6) Scheduled Publishing Architecture
 
-### Product Creation with Embedding
+```mermaid
+flowchart LR
+  H[Hangfire Recurring Job: platform-publisher]
+  J[PlatformPublisherJob]
+  S[PlatformPublishingService]
+  U[UnitOfWork]
+  P[ISocialPlatformPublisher Implementations]
+  F[Facebook Graph API]
 
-```
-Client                Controller           Service              Infrastructure      External
-  -                       -                  -                       -               -
-  --POST /products--------                  -                       -               -
-  - {productData}        -                  -                       -               -
-  -                      -                  -                       -               -
-  -                      --CreateAsync()----                       -               -
-  -                      -                  -                       -               -
-  -                      -                  --AddAsync()------------               -
-  -                      -                  -                       -               -
-  -                      -                  --SaveChanges()---------               -
-  -                      -                  -                       -               -
-  -                      -                  --Task.Run(Embed)-------               -
-  -                      -                  -     (non-blocking)   -               -
-  -                      -                  -                       -               -
-  -                      ---ProductDto-------                       -               -
-  -                      -                  -                       -               -
-  ---201 Created----------                  -                       -               -
-  - {productDto}         -                  -                       -               -
-  -                      -                  -                       -               -
-  -                      -                  -                  ---------------      -
-  -                      -                  -                  - Background         -
-  -                      -                  -                  - Thread             -
-  -                      -                  -                  -                    -
-  -                      -                  -                  --POST webhook--------
-  -                      -                  -                  - {productData}      -
-  -                      -                  -                  -                    -
-  -                      -                  -                  ---200 OK-------------
-  -                      -                  -                  -                    -
-  -                      -                  -                  --Log success        -
-  -                      -                  -                                       -
+  H --> J --> S --> U
+  S --> P --> F
 ```
 
-### Chatbot Order Creation
+Key behavior:
 
-```
-n8n                 Controller           Service              Repositories         Database
-  -                       -                  -                       -               -
-  --POST /chatbot----------                  -                       -               -
-  - {orderRequest}       -                  -                       -               -
-  -                      -                  -                       -               -
-  -                      --ProcessOrder()----                       -               -
-  -                      -                  -                       -               -
-  -                      -                  --GetByPageId()----------               -
-  -                      -                  -                       --SELECT----------
-  -                      -                  -                       -----Platform-----
-  -                      -                  ---SocialPlatform--------               -
-  -                      -                  -  (has StoreId)        -               -
-  -                      -                  -                       -               -
-  -                      -                  --GetByPSID()------------               -
-  -                      -                  -                       --SELECT----------
-  -                      -                  -                       -----Customer-----
-  -                      -                  ---Customer (or null)----               -
-  -                      -                  -                       -               -
-  -                      -                  --GetByName()------------               -
-  -                      -                  -  (for each item)      -               -
-  -                      -                  -                       --SELECT----------
-  -                      -                  -                       -----Product------
-  -                      -                  ---Product (or null)-----               -
-  -                      -                  -                       -               -
-  -                      -                  --AddAsync(Order)--------               -
-  -                      -                  -                       --INSERT----------
-  -                      -                  -                       -               -
-  -                      -                  --SaveChanges()----------               -
-  -                      -                  -                       -               -
-  -                      -                  --AddAsync(OrderProd)----               -
-  -                      -                  -  (for each match)     -               -
-  -                      -                  -                       --INSERT----------
-  -                      -                  -                       -               -
-  -                      -                  --SaveChanges()----------               -
-  -                      -                  -                       -               -
-  -                      ---OrderDto---------                       -               -
-  -                      -                  -                       -               -
-  ---201 Created----------                  -                       -               -
-  - {success, orderId}   -                  -                       -               -
-  -                      -                  -                       -               -
-```
+- Processes only due, pending platform posts.
+- Marks records as `Publishing` before external calls to reduce duplicate execution risk.
+- Updates per-platform and aggregate post status after execution.
 
 ---
 
-## --- Dependency Injection Structure
+## 7) Data Isolation and Security Model
 
+```mermaid
+flowchart TB
+  Req[Incoming Request]
+  JWT[JWT Authentication]
+  SC[X-Store-ID Context]
+  Access[Store Access Validation]
+  EF[EF Core Global Query Filters]
+  Data[(Tenant-Scoped Data)]
+
+  Req --> JWT --> SC --> Access --> EF --> Data
 ```
-------------------------------------------------------------------
--                     DI Container                                -
-------------------------------------------------------------------
--                                                                 -
--  Application Layer (AddApplicationServices)                     -
--  -- IProductService - ProductService                            -
--  -- IOrderService - OrderService                                -
--  -- ChatbotOrderService (concrete, no interface)               -
--  -- AutoMapper                                                  -
--                                                                 -
--  Infrastructure Layer (AddInfrastructureServices)               -
--  -- IProductEmbeddingService - ProductEmbeddingService          -
--  -- IUnitOfWork - UnitOfWork                                    -
--  -- IProductRepository - ProductRepository                      -
--  -- ICustomerRepository - CustomerRepository                    -
--  -- ISocialPlatformRepository - SocialPlatformRepository        -
--  -- IOrderRepository - OrderRepository                          -
--  -- IHttpClientFactory (built-in)                               -
--  -- DbContext                                                   -
--                                                                 -
--------------------------------------------------------------------
-```
+
+Controls in place:
+
+- JWT-based authentication and authorization.
+- Store membership/ownership validation before store-scoped operations.
+- EF Core global filters for soft-delete and store scoping.
 
 ---
 
-**All diagrams show the complete architecture and flow of both implemented features.**
+## 8) Core Technical Decisions
 
-For code-level details, see implementation files and documentation.
+1. **Repository + Unit of Work on EF Core**
+   - Keeps data access consistent and transaction boundaries explicit.
+
+2. **Middleware-first tenant resolution**
+   - Centralizes tenant context instead of repeating logic in each endpoint.
+
+3. **Service-oriented application layer**
+   - Business rules remain outside controllers and persistence layer.
+
+4. **Background processing for scheduled work**
+   - Time-based publishing runs independently from request/response paths.
+
+5. **Integration boundaries behind interfaces**
+   - External platforms are isolated through `ISocialPlatformPublisher` and service abstractions.
+
+---
+
+## 9) What This Demonstrates to Reviewers
+
+- Clear separation of concerns across a real multi-project .NET backend.
+- Practical multi-tenant API design with layered enforcement.
+- Production-oriented handling of async integrations and scheduled jobs.
+- Maintainable structure that supports feature growth without controller bloat.
+
+This is the architecture currently implemented in the repository.
